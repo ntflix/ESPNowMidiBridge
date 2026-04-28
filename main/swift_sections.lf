@@ -1,0 +1,12 @@
+[sections:swift_metadata]
+entries:
+    .swift_modhash
+
+[scheme:swift_flash_rodata]
+entries:
+    swift_metadata -> flash_rodata
+
+[mapping:main_swift_metadata]
+archive: libmain.a
+entries:
+    main (swift_flash_rodata)

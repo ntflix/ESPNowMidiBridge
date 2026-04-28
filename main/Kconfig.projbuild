@@ -1,0 +1,45 @@
+menu "ESPNOWMIDIBridge Configuration"
+
+    config ESPNOW_MIDI_ROOM_ID
+        hex "Room ID for ESP-NOW Bridge"
+        default 0x01
+        help
+            Compile-time constant identifying the room/zone for this bridge.
+            Peers only join bridges with matching room ID.
+
+    config ESPNOW_MIDI_WIFI_CHANNEL
+        int "WiFi Channel for ESP-NOW"
+        default 1
+        range 1 13
+        help
+            WiFi channel used for ESP-NOW communication (1-13).
+            All peers must use the same channel.
+
+    config ESPNOW_MIDI_ADVERTISEMENT_INTERVAL_MS
+        int "Advertisement Broadcast Interval (ms)"
+        default 5000
+        help
+            Interval in milliseconds between bridge advertisements.
+            Peers use this to discover the bridge.
+
+    config ESPNOW_MIDI_PEER_TIMEOUT_MS
+        int "Peer Timeout (ms)"
+        default 30000
+        help
+            Time in milliseconds before a peer is considered inactive.
+            Inactive peers are removed from the peer table.
+
+    config ESPNOW_MIDI_MAX_PEERS
+        int "Maximum Peer Count"
+        default 10
+        range 1 20
+        help
+            Maximum number of peers that can be in the peer table simultaneously.
+
+    config ESPNOW_MIDI_ENABLE_DEBUG
+        bool "Enable Debug Logging"
+        default y
+        help
+            Enable detailed debug output for development and troubleshooting.
+
+endmenu
