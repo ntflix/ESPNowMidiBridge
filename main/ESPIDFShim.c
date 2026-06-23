@@ -1,4 +1,5 @@
 #include "BridgingHeader.h"
+#include "sdkconfig.h"
 
 #include <stdint.h>
 #include <string.h>
@@ -65,6 +66,14 @@ void swift_task_delay(uint32_t ticks_to_delay) {
 
 uint32_t swift_get_time_ms(void) {
     return (uint32_t)(esp_timer_get_time() / 1000);
+}
+
+uint32_t swift_get_stuck_note_timeout_ms(void) {
+#ifdef CONFIG_ESPNOW_MIDI_STUCK_NOTE_TIMEOUT_MS
+    return (uint32_t)CONFIG_ESPNOW_MIDI_STUCK_NOTE_TIMEOUT_MS;
+#else
+    return 30000;
+#endif
 }
 
 void swift_register_espnow_callback(void) {

@@ -14,6 +14,8 @@ func app_main() {
     let radio = Radio()
     let translator = Translator()
     let serialTransport = SerialTransport()
+    let stuckNoteTimeoutMs = swift_get_stuck_note_timeout_ms()
+    let noteTracker = NoteTracker(timeoutMs: stuckNoteTimeoutMs)
 
     // Store global references for use in callbacks
     setGlobalRadio(radio)
@@ -31,6 +33,12 @@ func app_main() {
         return
     }
     gProtocolMode = true
+
+    if stuckNoteTimeoutMs == 0 {
+        protocolSafeLogInfo("Stuck note protection disabled\n")
+    } else {
+        protocolSafeLogInfo("Stuck note timeout: \(stuckNoteTimeoutMs) ms\n")
+    }
 
     // Start radio advertisement
     radio.startAdvertisement()
@@ -56,8 +64,18 @@ func app_main() {
                 if serialTransport.sendFrame(midiEvent) {
                     frameCount += 1
                 }
+
+                noteTracker.processIncoming(midiEvent, currentTimeMs: currentTimeMs)
             } else {
                 protocolSafeLogWarn("Translator returned nil for frame payload\n")
+            }
+        }
+
+        // Safety net: release notes that were never followed by Note Off.
+        let expiredNoteOffs = noteTracker.collectExpiredNoteOffs(currentTimeMs: currentTimeMs)
+        for noteOff in expiredNoteOffs {
+            if serialTransport.sendFrame(noteOff) {
+                frameCount += 1
             }
         }
 

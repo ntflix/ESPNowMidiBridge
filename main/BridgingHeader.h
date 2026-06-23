@@ -50,6 +50,7 @@ void swift_queue_delete(SwiftQueueHandle queue);
 
 void swift_task_delay(uint32_t ticks_to_delay);
 uint32_t swift_get_time_ms(void);
+uint32_t swift_get_stuck_note_timeout_ms(void);
 
 void swift_register_espnow_callback(void);
 SwiftQueueHandle swift_get_espnow_rx_queue(void);

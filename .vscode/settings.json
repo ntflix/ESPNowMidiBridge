@@ -1,0 +1,21 @@
+{
+  "C_Cpp.intelliSenseEngine": "default",
+  "idf.openOcdConfigs": [
+    "board/esp32c6-builtin.cfg"
+  ],
+  "idf.port": "/dev/tty.usbmodem1101",
+  "idf.currentSetup": "/Users/felix/.espressif/v6.0/esp-idf",
+  "idf.customExtraVars": {
+    "ESP_ROM_ELF_DIR": "/Users/felix/.espressif/tools/esp-rom-elfs/20240305/",
+    "OPENOCD_SCRIPTS": "/Users/felix/.espressif/tools/openocd-esp32/v0.12.0-esp32-20240318/openocd-esp32/share/openocd/scripts",
+    "IDF_TARGET": "esp32c6",
+    "OPENOCD_USB_ADAPTER_LOCATION": "1-1"
+  },
+  "clangd.path": "/Users/felix/.espressif/tools/esp-clang/esp-20.1.1_20250829/esp-clang/bin/clangd",
+  "clangd.arguments": [
+    "--background-index",
+    "--query-driver=**",
+    "--compile-commands-dir=/Users/felix/Code/ESPNOWMIDI/ESPNOWMIDIBridge/build"
+  ],
+  "idf.flashType": "UART"
+}

@@ -145,33 +145,99 @@ public class Translator {
 
     private func translateFixedMIDIEvent(frame: ESPNOWFrame) -> MIDIEventFrame? {
         let p = frame.payload
-        guard p.count >= 11 else { return nil }
 
-        let srcMac: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8) = (
-            p[0], p[1], p[2], p[3], p[4], p[5]
-        )
-        let channel = p[6] & 0x0F
-        let status = p[7]
-        let data1 = p[8]
-        let data2 = p[9]
-        let sysexLen = Int(p[10])
+        // 1) Older fixed-format (source MAC embedded in payload)
+        if p.count >= 11 {
+            let srcMac: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8) = (
+                p[0], p[1], p[2], p[3], p[4], p[5]
+            )
+            let channel = p[6] & 0x0F
+            let status = p[7]
+            let data1 = p[8]
+            let data2 = p[9]
+            let sysexLen = Int(p[10])
 
-        var sysexData: [UInt8] = []
-        if sysexLen > 0 {
-            let end = min(11 + sysexLen, p.count)
-            sysexData = Array(p[11..<end])
+            var sysexData: [UInt8] = []
+            if sysexLen > 0 {
+                let end = min(11 + sysexLen, p.count)
+                sysexData = Array(p[11..<end])
+            }
+
+            let eventType = MidiEventType(rawValue: status)
+
+            return MIDIEventFrame(
+                sourceMac: srcMac,
+                channel: channel,
+                eventType: eventType,
+                data1: data1,
+                data2: data2,
+                sysExData: sysexData
+            )
         }
 
-        let eventType = MidiEventType(rawValue: status)
+        // 2) ESPNOWBridgePacket format from Python client
+        // Format: <MAGIC='A' (0x41), VERSION(1), pkt_type, channel, note, velocity, bend(int16), 0, 0>
+        if p.count >= 10 && p[0] == 0x41 {  // 'A'
+            let version = p[1]
+            // Only support version 1 for now
+            guard version == 1 else { return nil }
 
-        return MIDIEventFrame(
-            sourceMac: srcMac,
-            channel: channel,
-            eventType: eventType,
-            data1: data1,
-            data2: data2,
-            sysExData: sysexData
-        )
+            let pktType = p[2]
+            let channel = p[3] & 0x0F
+
+            switch pktType {
+            case 0:  // NOTE_OFF
+                let note = p.count > 4 ? p[4] : 0
+                let velocity = p.count > 5 ? p[5] : 0
+                return MIDIEventFrame(
+                    sourceMac: frame.senderMac,
+                    channel: channel,
+                    eventType: .noteOff,
+                    data1: note,
+                    data2: velocity,
+                    sysExData: []
+                )
+
+            case 1:  // NOTE_ON
+                let note = p.count > 4 ? p[4] : 0
+                let velocity = p.count > 5 ? p[5] : 0
+                return MIDIEventFrame(
+                    sourceMac: frame.senderMac,
+                    channel: channel,
+                    eventType: .noteOn,
+                    data1: note,
+                    data2: velocity,
+                    sysExData: []
+                )
+
+            case 2:  // PITCH_BEND
+                // bend is signed 16-bit little-endian at bytes 6..7 (offset 6 and 7)
+                if p.count > 7 {
+                    let lo = UInt16(p[6])
+                    let hi = UInt16(p[7])
+                    let combined = lo | (hi << 8)
+                    let bendRaw = Int16(bitPattern: combined)
+                    // convert signed bend to unsigned 14-bit value centered at 8192
+                    let raw14 = Int(bendRaw) + 8192
+                    let lsb = UInt8(raw14 & 0x7F)
+                    let msb = UInt8((raw14 >> 7) & 0x7F)
+                    return MIDIEventFrame(
+                        sourceMac: frame.senderMac,
+                        channel: channel,
+                        eventType: .pitchBend,
+                        data1: lsb,
+                        data2: msb,
+                        sysExData: []
+                    )
+                }
+                return nil
+
+            default:
+                return nil
+            }
+        }
+
+        return nil
     }
 }
 
