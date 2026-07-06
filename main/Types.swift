@@ -214,7 +214,7 @@ public struct ESPNOWFrame {
 
 // MARK: - Frame Constants
 public struct FrameConstants {
-    public static let MAGIC_BYTE_STRING = "TJAM"
+    public static let MAGIC_BYTE_STRING = "MJAM"
     public static let MAGIC_BYTE_0: UInt8 = UInt8(MAGIC_BYTE_STRING.utf8CString[0])
     public static let MAGIC_BYTE_1: UInt8 = UInt8(MAGIC_BYTE_STRING.utf8CString[1])
     public static let MAGIC_BYTE_2: UInt8 = UInt8(MAGIC_BYTE_STRING.utf8CString[2])
