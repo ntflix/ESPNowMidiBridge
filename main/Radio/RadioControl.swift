@@ -5,7 +5,7 @@ extension Radio {
         to mac: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8),
         type: ESPNOWMessageType,
         payload: [UInt8]
-    ) {
+    ) throws(RadioError) {
         var frame: [UInt8] = []
         frame.append(FrameConstants.MAGIC_BYTE_0)
         frame.append(FrameConstants.MAGIC_BYTE_1)
@@ -48,7 +48,7 @@ extension Radio {
             ensurePeer(mac: srcMac)
 
             // Send JOINED ack; echo room id
-            sendFrame(to: srcMac, type: .joinedAck, payload: [roomId])
+            try? sendFrame(to: srcMac, type: .joinedAck, payload: [roomId])
 
         case .leave:
             protocolSafeLogInfo("Received LEAVE from \(formatMACAddress(srcMac))\n")

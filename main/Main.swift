@@ -11,41 +11,25 @@ func app_main() {
     protocolSafeLogInfo("WiFi MAC Address: \(wifiMacAddress)\n")
 
     // Initialise components
-    let radio = Radio()
+    guard let radio = try? Radio() else {
+        protocolSafeLogError("Radio Initialisation failed\n")
+        return
+    }
     let translator = Translator()
     let serialTransport = SerialTransport()
     let stuckNoteTimeoutMs = swift_get_stuck_note_timeout_ms()
     let noteTracker = NoteTracker(timeoutMs: stuckNoteTimeoutMs)
 
-    // Store global references for use in callbacks
-    setGlobalRadio(radio)
-    setGlobalSerialTransport(serialTransport)
-
-    // Initialise Radio
-    guard radio.Initialise() else {
-        protocolSafeLogError("Radio Initialisation failed\n")
-        return
-    }
-
     // Initialise SerialTransport
-    guard serialTransport.Initialise() else {
+    guard serialTransport.initialise() else {
         protocolSafeLogError("SerialTransport Initialisation failed\n")
         return
-    }
-    gProtocolMode = true
-
-    if stuckNoteTimeoutMs == 0 {
-        protocolSafeLogInfo("Stuck note protection disabled\n")
-    } else {
-        protocolSafeLogInfo("Stuck note timeout: \(stuckNoteTimeoutMs) ms\n")
     }
 
     // Start radio advertisement
     radio.startAdvertisement()
 
     protocolSafeLogInfo("All components Initialised\n")
-    var frameCount: UInt32 = 0
-    var lastLogMs = swift_get_time_ms()
 
     while true {
         let currentTimeMs = swift_get_time_ms()
@@ -60,32 +44,22 @@ func app_main() {
             if let midiEvent = translator.translate(frame: frame) {
                 protocolSafeLogInfo("Translated MIDIEventFrame: \(midiEvent.describe())\n")
                 protocolSafeLogInfo("Translated raw bytes: \(midiEvent.hexBytes())\n")
-
-                if serialTransport.sendFrame(midiEvent) {
-                    frameCount += 1
-                }
-
+                try? serialTransport.sendFrame(midiEvent)
                 noteTracker.processIncoming(midiEvent, currentTimeMs: currentTimeMs)
             } else {
                 protocolSafeLogWarn("Translator returned nil for frame payload\n")
             }
         }
 
-        // Safety net: release notes that were never followed by Note Off.
+        // Release notes that were never followed by Note Off
         let expiredNoteOffs = noteTracker.collectExpiredNoteOffs(currentTimeMs: currentTimeMs)
         for noteOff in expiredNoteOffs {
-            if serialTransport.sendFrame(noteOff) {
-                frameCount += 1
-            }
+            try? serialTransport.sendFrame(noteOff)
         }
 
         // Send periodic advertisements
-        radio.sendAdvertisement(currentTimeMs: currentTimeMs)
-
-        // Log stats periodically (every 10 seconds)
-        if currentTimeMs - lastLogMs >= 10000 {
-            protocolSafeLogInfo("Frames processed: \(frameCount)\n")
-            lastLogMs = currentTimeMs
+        if currentTimeMs - radio.lastAdvertisementMs >= 1000 {
+            radio.sendAdvertisement(currentTimeMs: currentTimeMs)
         }
 
         // Yield to FreeRTOS scheduler (1 tick = ~10ms)

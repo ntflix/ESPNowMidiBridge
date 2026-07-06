@@ -29,6 +29,14 @@ menu "ESPNOWMIDIBridge Configuration"
             Time in milliseconds before a peer is considered inactive.
             Inactive peers are removed from the peer table.
 
+    config ESPNOW_MIDI_STUCK_NOTE_TIMEOUT_MS
+        int "Stuck Note Timeout (ms)"
+        default 10000
+        range 0 600000
+        help
+            Time in milliseconds before an active note is auto-released with Note Off.
+            Set to 0 to disable stuck-note protection.
+
     config ESPNOW_MIDI_MAX_PEERS
         int "Maximum Peer Count"
         default 10

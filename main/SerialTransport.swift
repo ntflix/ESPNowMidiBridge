@@ -9,7 +9,7 @@ public class SerialTransport {
     }
 
     /// Initialise USB Serial/JTAG
-    public func Initialise() -> Bool {
+    public func initialise() -> Bool {
         // Use Swift shim to Initialise USB Serial/JTAG buffers
         if swift_usb_serial_init(128, 256) {
             isInitialised = true
@@ -22,10 +22,10 @@ public class SerialTransport {
     }
 
     /// Send a MIDI event frame over USB Serial/JTAG
-    public func sendFrame(_ frame: MIDIEventFrame) -> Bool {
+    public func sendFrame(_ frame: MIDIEventFrame) throws(SerialTransportError) {
         guard isInitialised else {
             protocolSafeLogWarn("SerialTransport not Initialised\n")
-            return false
+            throw SerialTransportError.notInitialised
         }
 
         let frameBytes = frame.toBytes()
@@ -39,7 +39,7 @@ public class SerialTransport {
             protocolSafeLogError("COBS self-test failed: decode returned nil\n")
             protocolSafeLogError("Raw: \(frameBytes)\n")
             protocolSafeLogError("Encoded: \(encodedBytes)\n")
-            return false
+            throw SerialTransportError.decodeReturnedNil
         }
 
         if decodedBytes != frameBytes {
@@ -47,7 +47,7 @@ public class SerialTransport {
             protocolSafeLogError("Raw: \(frameBytes)\n")
             protocolSafeLogError("Encoded: \(encodedBytes)\n")
             protocolSafeLogError("Decoded: \(decodedBytes)\n")
-            return false
+            throw SerialTransportError.roundTripMismatch
         }
 
         var transmitBuffer = encodedBytes
@@ -63,11 +63,11 @@ public class SerialTransport {
 
         if writeLen == Int32(transmitBuffer.count) {
             swift_usb_serial_flush()
-            return true
+        } else if writeLen > 0 {
+            protocolSafeLogWarn("Wrote \(writeLen) bytes out of \(transmitBuffer.count)\n")
+        } else {
+            protocolSafeLogWarn("Failed to write to USB\n")
         }
-
-        protocolSafeLogWarn("Partial write to USB\n")
-        return writeLen > 0
     }
 
     /// DeInitialise the transport
@@ -77,15 +77,4 @@ public class SerialTransport {
             isInitialised = false
         }
     }
-}
-
-// MARK: - Global SerialTransport Instance
-private var gSerialTransport: SerialTransport? = nil
-
-func setGlobalSerialTransport(_ transport: SerialTransport) {
-    gSerialTransport = transport
-}
-
-func getGlobalSerialTransport() -> SerialTransport? {
-    return gSerialTransport
 }

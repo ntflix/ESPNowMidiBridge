@@ -1,48 +1,35 @@
 public class Radio {
 
-    // Peer table (statically allocated)
-    var peers: [PeerEntry] = Array(
-        repeating: PeerEntry(
+    var peers: [PeerEntry] = [
+        PeerEntry(
             mac: (0, 0, 0, 0, 0, 0),
             lastHeardMs: 0,
             isActive: false
-        ),
-        count: 10
-    )
+        )
+    ]
 
     // Queue handle for ESP-NOW frames
     private var rxQueueHandle: UInt = 0
 
     // Stats
     private var droppedFrameCount: UInt32 = 0
-    private var lastAdvertisementMs: UInt32 = 0
+    public var lastAdvertisementMs: UInt32 = 0
 
-    public init() {
-        // Initialised in app_main
-    }
-
-    /// Initialise WiFi and ESP-NOW
-    public func Initialise() -> Bool {
+    public init() throws(RadioError) {
         if !swift_radio_stack_init() {
             protocolSafeLogError("Radio stack init failed\n")
-            return false
+            throw RadioError.failedToInitialise
         }
 
         swift_register_espnow_callback()
         rxQueueHandle = swift_get_espnow_rx_queue()
 
         protocolSafeLogInfo("Radio Initialised\n")
-        return true
     }
 
     /// Start the radio advertisement task
     public func startAdvertisement() {
         lastAdvertisementMs = swift_get_time_ms()
-    }
-
-    /// Call this from your main loop to prune idle peers.
-    public func maintain() {
-        pruneIdlePeers()
     }
 
     /// Process incoming frames from the queue
@@ -166,7 +153,7 @@ public class Radio {
             return
         }
 
-        self.maintain()  // Prune idle peers before advertising
+        self.pruneIdlePeers()  // Prune idle peers before advertising
 
         lastAdvertisementMs = currentTimeMs
 
@@ -197,16 +184,4 @@ public class Radio {
         let activePeers = peers.filter { $0.isActive }.count
         protocolSafeLogInfo("Peers: \(activePeers)\n")
     }
-}
-
-// MARK: - Global instance
-
-private var gRadio: Radio? = nil
-
-func setGlobalRadio(_ radio: Radio) {
-    gRadio = radio
-}
-
-func getGlobalRadio() -> Radio? {
-    return gRadio
 }

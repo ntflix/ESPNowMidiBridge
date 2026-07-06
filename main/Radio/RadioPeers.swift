@@ -46,12 +46,14 @@ extension Radio {
         let now = swift_get_time_ms()
 
         for i in 0..<peers.count where peers[i].isActive {
-            let last = peers[i].lastHeardMs
-            if now &- last > PEER_TIMEOUT_MS {
+            let lastHeard = peers[i].lastHeardMs
+
+            if now &- lastHeard > PEER_TIMEOUT_MS {
                 let mac = peers[i].mac
                 let arr: [UInt8] = [mac.0, mac.1, mac.2, mac.3, mac.4, mac.5]
+
                 arr.withUnsafeBufferPointer { macPtr in
-                    self.sendFrame(to: mac, type: .leave, payload: [])
+                    try? self.sendFrame(to: mac, type: .leave, payload: [])
                     let ok = swift_espnow_del_peer(macPtr.baseAddress)
                     if ok {
                         protocolSafeLogInfo("Removed idle peer \(formatMACAddress(mac))\n")

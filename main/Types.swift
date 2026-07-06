@@ -1,5 +1,5 @@
 /// MIDI Event Frame structures and types
-/// These are sent over the USB CDC-ACM link to the Raspberry Pi host.
+/// These are sent over the USB CDC-ACM link to the USB-connected host.
 
 public enum MidiEventType {
     case noteOn
@@ -97,7 +97,7 @@ public enum MidiEventType {
 }
 
 // MARK: - MIDI Event Frame
-/// Represents a MIDI event to be sent to the Raspberry Pi host.
+/// Represents a MIDI event to be sent to the USB-connected host.
 /// Layout (must be kept in sync with PROTOCOL.md):
 /// - Byte 0-5:   SOURCE_MAC
 /// - Byte 6:     MIDI channel (0-15)
@@ -214,10 +214,11 @@ public struct ESPNOWFrame {
 
 // MARK: - Frame Constants
 public struct FrameConstants {
-    public static let MAGIC_BYTE_0: UInt8 = 0x45  // 'E'
-    public static let MAGIC_BYTE_1: UInt8 = 0x50  // 'P'
-    public static let MAGIC_BYTE_2: UInt8 = 0x4E  // 'N'
-    public static let MAGIC_BYTE_3: UInt8 = 0x57  // 'W'
+    public static let MAGIC_BYTE_STRING = "TJAM"
+    public static let MAGIC_BYTE_0: UInt8 = UInt8(MAGIC_BYTE_STRING.utf8CString[0])
+    public static let MAGIC_BYTE_1: UInt8 = UInt8(MAGIC_BYTE_STRING.utf8CString[1])
+    public static let MAGIC_BYTE_2: UInt8 = UInt8(MAGIC_BYTE_STRING.utf8CString[2])
+    public static let MAGIC_BYTE_3: UInt8 = UInt8(MAGIC_BYTE_STRING.utf8CString[3])
 
     public static let ROOM_ID: UInt8 = 0x01  // Compile-time constant
     public static let MAX_PAYLOAD_SIZE: Int = 250
