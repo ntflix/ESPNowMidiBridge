@@ -58,6 +58,10 @@ extension Radio {
         case .advertisement, .data, .joinedAck:
             // Data or non-control messages are handled at higher layers
             break
+
+        case .instruments:
+            protocolSafeLogInfo("Received INSTRUMENTS from \(formatMACAddress(srcMac))\n")
+        // Handle instruments message if needed
         }
     }
 

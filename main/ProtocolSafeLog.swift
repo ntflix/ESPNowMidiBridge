@@ -1,4 +1,4 @@
-public var shouldPrint = true
+public var shouldPrint = false
 
 public func protocolSafePrint(_ message: String) {
     if !shouldPrint {
