@@ -31,7 +31,7 @@ menu "ESPNOWMIDIBridge Configuration"
 
     config ESPNOW_MIDI_STUCK_NOTE_TIMEOUT_MS
         int "Stuck Note Timeout (ms)"
-        default 10000
+        default 20000
         range 0 600000
         help
             Time in milliseconds before an active note is auto-released with Note Off.

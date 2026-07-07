@@ -105,14 +105,7 @@ public struct MappingRule {
 
 // MARK: - Translator Component
 public class Translator {
-    /// Mapping rules
-    private let mappingRules: [MappingRule]
-
-    public init() {
-        // Define mapping rules here
-        // This is where we can configure behavior
-        mappingRules = MappingConfig.rules
-    }
+    public init() {}
 
     /// Process an incoming frame and produce a MIDI event if matched
     public func translate(frame: ESPNOWFrame) -> MIDIEventFrame? {
@@ -124,184 +117,90 @@ public class Translator {
 
         protocolSafeLogInfo("Translator input payload: \(frame.payload)\n")
 
-        // 1) Try fixed-format ESPNOWMIDIClient layout
-        if let evt = translateFixedMIDIEvent(frame: frame) {
-            protocolSafeLogInfo("Translator parsed fixed MIDI event: \(evt.describe())\n")
-            return evt
-        }
-
-        // 2) Fallback to rule-based mappings (for other devices)
-        for rule in mappingRules {
-            if rule.matches(frame: frame) {
-                let result = rule.apply(frame: frame)
-                protocolSafeLogInfo("Translator matched rule; result: \(result.describe())\n")
-                return result
-            }
+        do {
+            let event = try translateFixedMIDIEvent(frame: frame)
+            protocolSafeLogInfo("Translator parsed fixed MIDI event: \(event.describe())\n")
+            return event
+        } catch let error {
+            protocolSafeLogWarn("Translator fixed-format parse failed: \(error)\n")
         }
 
         protocolSafeLogWarn("Translator found no matching rule\n")
         return nil
     }
 
-    private func translateFixedMIDIEvent(frame: ESPNOWFrame) -> MIDIEventFrame? {
+    private func translateFixedMIDIEvent(frame: ESPNOWFrame) throws(TranslatorError)
+        -> MIDIEventFrame
+    {
+        /*
+        Structure:
+            0-3:    MAGIC
+            4:      version
+            5:      event type (status)
+            6:      channel
+            7:      data1
+            8:      data2
+        */
+
         let p = frame.payload
 
-        // 1) Older fixed-format (source MAC embedded in payload)
-        if p.count >= 11 {
-            let srcMac: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8) = (
-                p[0], p[1], p[2], p[3], p[4], p[5]
-            )
-            let channel = p[6] & 0x0F
-            let status = p[7]
-            let data1 = p[8]
-            let data2 = p[9]
-            let sysexLen = Int(p[10])
+        guard p.count >= 9 else {
+            throw TranslatorError.payloadTooShort
+        }
 
-            var sysexData: [UInt8] = []
-            if sysexLen > 0 {
-                let end = min(11 + sysexLen, p.count)
-                sysexData = Array(p[11..<end])
-            }
+        let expectedMagic = FrameConstants.MAGIC_BYTE_STRING.utf8CString.prefix(4).map {
+            UInt8(bitPattern: $0)
+        }
 
-            let eventType = MidiEventType(rawValue: status)
+        guard Array(p[0..<4]) == expectedMagic else {
+            throw TranslatorError.invalidMagicBytes
+        }
+
+        let version = p[4]
+        let eventType = p[5]
+        let channel = p[6] & 0x0F
+        let data1 = p[7]
+        let data2 = p[8]
+
+        // Only support version 1 for now
+        guard version == 1 else { throw TranslatorError.unsupportedVersion }
+
+        switch eventType {
+
+        case MidiEventType.noteOff.rawValue,
+            MidiEventType.noteOn.rawValue,
+            MidiEventType.controlChange.rawValue:
 
             return MIDIEventFrame(
-                sourceMac: srcMac,
+                sourceMac: frame.senderMac,
                 channel: channel,
-                eventType: eventType,
+                eventType: MidiEventType(rawValue: eventType),
                 data1: data1,
                 data2: data2,
-                sysExData: sysexData
+                sysExData: []
             )
+
+        case MidiEventType.pitchBend.rawValue:  // PITCH_BEND
+            // bend is signed 16-bit little-endian
+            let lo = UInt16(data1)
+            let hi = UInt16(data2)
+            let combined = lo | (hi << 8)
+            let bendRaw = Int16(bitPattern: combined)
+            // convert signed bend to unsigned 14-bit value centered at 8192
+            let raw14 = Int(bendRaw) + 8192
+            let lsb = UInt8(raw14 & 0x7F)
+            let msb = UInt8((raw14 >> 7) & 0x7F)
+            return MIDIEventFrame(
+                sourceMac: frame.senderMac,
+                channel: channel,
+                eventType: MidiEventType(rawValue: eventType),
+                data1: lsb,
+                data2: msb,
+                sysExData: []
+            )
+
+        default:
+            throw TranslatorError.unknownPacketType
         }
-
-        // 2) ESPNOWBridgePacket format from Python client
-        // Format: <MAGIC='A' (0x41), VERSION(1), pkt_type, channel, note, velocity, bend(int16), 0, 0>
-        if p.count >= 10 && p[0] == 0x41 {  // 'A'
-            let version = p[1]
-            // Only support version 1 for now
-            guard version == 1 else { return nil }
-
-            let pktType = p[2]
-            let channel = p[3] & 0x0F
-
-            switch pktType {
-            case 0:  // NOTE_OFF
-                let note = p.count > 4 ? p[4] : 0
-                let velocity = p.count > 5 ? p[5] : 0
-                return MIDIEventFrame(
-                    sourceMac: frame.senderMac,
-                    channel: channel,
-                    eventType: .noteOff,
-                    data1: note,
-                    data2: velocity,
-                    sysExData: []
-                )
-
-            case 1:  // NOTE_ON
-                let note = p.count > 4 ? p[4] : 0
-                let velocity = p.count > 5 ? p[5] : 0
-                return MIDIEventFrame(
-                    sourceMac: frame.senderMac,
-                    channel: channel,
-                    eventType: .noteOn,
-                    data1: note,
-                    data2: velocity,
-                    sysExData: []
-                )
-
-            case 2:  // PITCH_BEND
-                // bend is signed 16-bit little-endian at bytes 6..7 (offset 6 and 7)
-                if p.count > 7 {
-                    let lo = UInt16(p[6])
-                    let hi = UInt16(p[7])
-                    let combined = lo | (hi << 8)
-                    let bendRaw = Int16(bitPattern: combined)
-                    // convert signed bend to unsigned 14-bit value centered at 8192
-                    let raw14 = Int(bendRaw) + 8192
-                    let lsb = UInt8(raw14 & 0x7F)
-                    let msb = UInt8((raw14 >> 7) & 0x7F)
-                    return MIDIEventFrame(
-                        sourceMac: frame.senderMac,
-                        channel: channel,
-                        eventType: .pitchBend,
-                        data1: lsb,
-                        data2: msb,
-                        sysExData: []
-                    )
-                }
-                return nil
-
-            default:
-                return nil
-            }
-        }
-
-        return nil
     }
-}
-
-// MARK: - Mapping Configuration
-/// mapping rules
-public struct MappingConfig {
-    static let rules: [MappingRule] = [
-        // Example rule 1: Note On from payload byte 1
-        // Matches: payload[0] == 0x10
-        MappingRule(
-            matchOffset: 0,
-            matchMask: 0xFF,
-            matchValue: 0x10,
-            senderMacFilter: nil,
-            midiChannel: 0,
-            midiEventType: .noteOn,
-            data1Source: .payloadByte(1),  // Note number from payload[1]
-            data2Source: .payloadByte(2),  // Velocity from payload[2]
-            sysExPayloadStart: nil,
-            sysExPayloadLen: nil
-        ),
-
-        // Example rule 2: Control Change from payload byte 1
-        // Matches: payload[0] == 0x20
-        MappingRule(
-            matchOffset: 0,
-            matchMask: 0xFF,
-            matchValue: 0x20,
-            senderMacFilter: nil,
-            midiChannel: 1,
-            midiEventType: .controlChange,
-            data1Source: .payloadByte(1),  // CC number
-            data2Source: .payloadByte(2),  // CC value
-            sysExPayloadStart: nil,
-            sysExPayloadLen: nil
-        ),
-
-        // Example rule 3: Program Change
-        // Matches: payload[0] == 0x30
-        MappingRule(
-            matchOffset: 0,
-            matchMask: 0xFF,
-            matchValue: 0x30,
-            senderMacFilter: nil,
-            midiChannel: 0,
-            midiEventType: .programChange,
-            data1Source: .payloadByte(1),  // Program number
-            data2Source: .unused,
-            sysExPayloadStart: nil,
-            sysExPayloadLen: nil
-        ),
-
-        // Example rule: Note from ESPNOWMIDIClient
-        MappingRule(
-            matchOffset: 0,
-            matchMask: 0xFF,
-            matchValue: 0x10,  // our “note event” tag
-            senderMacFilter: nil,  // or the client MAC if you want
-            midiChannel: 0,  // or something configured
-            midiEventType: .noteOn,  // noteOn / noteOff inferred later if needed
-            data1Source: .payloadByte(1),  // note
-            data2Source: .payloadByte(2),  // velocity
-            sysExPayloadStart: nil,
-            sysExPayloadLen: nil
-        ),
-    ]
 }
