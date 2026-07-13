@@ -212,7 +212,7 @@ Rules are evaluated in order; the first matching rule is applied.
 ## Notes for Client Implementers
 
 1. Bridge Discovery: Scan for ADVERTISEMENT frames to find the bridge MAC address
-2. Peer Management: The bridge removes peers after 30 seconds of inactivity
+2. Peer Management: The bridge removes peers after 30 seconds of inactivity (this does not actually do anything though, as the bridge accepts notes from anything)
 3. Note Keepalive: Send keepalive packets more frequently than the keepalive timeout (default: 100ms). Example: send keepalive every 50-80ms while a note is held
 4. Keepalive Tolerance: The bridge tolerates N consecutive missed keepalives before releasing a note (default: 3). This means a connection can be down for roughly N × timeout_ms before a note is released
 5. Stuck Notes: Send NOTE_OFF promptly; if you forget or the connection drops:
