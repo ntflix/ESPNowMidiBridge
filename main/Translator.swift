@@ -108,6 +108,7 @@ public class Translator {
     public init() {}
 
     /// Process an incoming frame and produce a MIDI event if matched
+    /// For NOTE_KEEPALIVE, returns nil (caller handles via dedicated method)
     public func translate(frame: ESPNOWFrame) -> MIDIEventFrame? {
         // Only process DATA frames
         guard frame.messageType == .data else {
@@ -127,6 +128,29 @@ public class Translator {
 
         protocolSafeLogWarn("Translator found no matching rule\n")
         return nil
+    }
+
+    /// Extract keepalive data from NOTE_KEEPALIVE frame
+    /// Payload format: [channel, note]
+    /// Returns (sourceMac, channel, note) or nil if invalid
+    public func extractKeepalive(frame: ESPNOWFrame) -> (channel: UInt8, note: UInt8)? {
+        guard frame.messageType == .noteKeepalive else {
+            return nil
+        }
+
+        guard frame.payload.count >= 2 else {
+            protocolSafeLogWarn("Translator: NOTE_KEEPALIVE payload too short\n")
+            return nil
+        }
+
+        let channel = frame.payload[0]
+        let note = frame.payload[1]
+
+        protocolSafeLogDebug(
+            "Translator: NOTE_KEEPALIVE ch=\(channel) note=\(note) from \(formatMACAddress(frame.senderMac))\n"
+        )
+
+        return (channel: channel, note: note)
     }
 
     private func translateFixedMIDIEvent(frame: ESPNOWFrame) throws(TranslatorError)

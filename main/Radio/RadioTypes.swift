@@ -48,4 +48,5 @@ public enum ESPNOWMessageType: UInt8 {
     case advertisement = 0x04
     case joinedAck = 0x05
     case instruments = 0x06
+    case noteKeepalive = 0x07
 }

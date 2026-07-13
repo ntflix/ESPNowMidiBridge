@@ -55,7 +55,7 @@ extension Radio {
         // Optional: proactively mark inactive and delete at C level
         // (pruneIdlePeers will also clean up after timeout)
 
-        case .advertisement, .data, .joinedAck:
+        case .advertisement, .data, .joinedAck, .noteKeepalive:
             // Data or non-control messages are handled at higher layers
             break
 

@@ -31,11 +31,32 @@ menu "ESPNOWMIDIBridge Configuration"
 
     config ESPNOW_MIDI_STUCK_NOTE_TIMEOUT_MS
         int "Stuck Note Timeout (ms)"
-        default 20000
+        default 60000
         range 0 600000
         help
             Time in milliseconds before an active note is auto-released with Note Off.
             Set to 0 to disable stuck-note protection.
+
+    config ESPNOW_MIDI_NOTE_KEEPALIVE_INTERVAL_MS
+        int "Note Keepalive Timeout (ms)"
+        default 100
+        range 0 10000
+        help
+            Timeout in milliseconds for monitoring keepalive packets from clients.
+            When a NOTE_ON is received, the bridge starts monitoring for keepalive packets.
+            If no keepalive is received within this timeout, it counts as a missed keepalive.
+            This prevents notes from being held forever if the client disconnects.
+            Set to 0 to disable keepalive monitoring (rely only on stuck-note timeout).
+
+    config ESPNOW_MIDI_KEEPALIVE_MISS_THRESHOLD
+        int "Keepalive Miss Threshold"
+        default 3
+        range 1 20
+        help
+            Number of consecutive missed keepalives before a NOTE_OFF is generated.
+            This provides tolerance for occasional WiFi packet loss.
+            Higher values are more tolerant of lossy connections.
+            Minimum value is 1 (generate NOTE_OFF after first miss).
 
     config ESPNOW_MIDI_MAX_PEERS
         int "Maximum Peer Count"

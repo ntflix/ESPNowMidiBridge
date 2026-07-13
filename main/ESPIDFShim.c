@@ -72,7 +72,23 @@ uint32_t swift_get_stuck_note_timeout_ms(void) {
 #ifdef CONFIG_ESPNOW_MIDI_STUCK_NOTE_TIMEOUT_MS
     return (uint32_t)CONFIG_ESPNOW_MIDI_STUCK_NOTE_TIMEOUT_MS;
 #else
-    return 30000;
+    return 60000;
+#endif
+}
+
+uint32_t swift_get_note_keepalive_interval_ms(void) {
+#ifdef CONFIG_ESPNOW_MIDI_NOTE_KEEPALIVE_INTERVAL_MS
+    return (uint32_t)CONFIG_ESPNOW_MIDI_NOTE_KEEPALIVE_INTERVAL_MS;
+#else
+    return 100;
+#endif
+}
+
+uint32_t swift_get_keepalive_miss_threshold(void) {
+#ifdef CONFIG_ESPNOW_MIDI_KEEPALIVE_MISS_THRESHOLD
+    return (uint32_t)CONFIG_ESPNOW_MIDI_KEEPALIVE_MISS_THRESHOLD;
+#else
+    return 3;
 #endif
 }
 

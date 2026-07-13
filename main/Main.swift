@@ -18,12 +18,28 @@ func app_main() {
     let translator = Translator()
     let serialTransport = SerialTransport()
     let stuckNoteTimeoutMs = swift_get_stuck_note_timeout_ms()
-    let noteTracker = NoteTracker(timeoutMs: stuckNoteTimeoutMs)
+    let keepaliveTimeoutMs = swift_get_note_keepalive_interval_ms()
+    let keepaliveMissThreshold = swift_get_keepalive_miss_threshold()
+    let noteTracker = NoteTracker(
+        stuckNoteTimeoutMs: stuckNoteTimeoutMs,
+        keepaliveTimeoutMs: keepaliveTimeoutMs,
+        keepaliveMissThreshold: keepaliveMissThreshold
+    )
 
     // Initialise SerialTransport
     guard serialTransport.initialise() else {
         protocolSafeLogError("SerialTransport Initialisation failed\n")
         return
+    }
+
+    // Log configuration
+    protocolSafeLogInfo("Stuck note timeout: \(stuckNoteTimeoutMs)ms\n")
+    if keepaliveTimeoutMs > 0 {
+        protocolSafeLogInfo(
+            "Keepalive timeout: \(keepaliveTimeoutMs)ms, miss threshold: \(keepaliveMissThreshold)\n"
+        )
+    } else {
+        protocolSafeLogInfo("Keepalive monitoring disabled\n")
     }
 
     // Start radio advertisement
@@ -41,7 +57,17 @@ func app_main() {
             )
             protocolSafeLogInfo("RX payload hex: \(hexBytes(frame.payload))\n")
 
-            if let midiEvent = translator.translate(frame: frame) {
+            // Handle NOTE_KEEPALIVE frames
+            if frame.messageType == .noteKeepalive {
+                if let (channel, note) = translator.extractKeepalive(frame: frame) {
+                    noteTracker.refreshKeepalive(
+                        sourceMac: frame.senderMac,
+                        channel: channel,
+                        note: note,
+                        currentTimeMs: currentTimeMs
+                    )
+                }
+            } else if let midiEvent = translator.translate(frame: frame) {
                 protocolSafeLogInfo("Translated MIDIEventFrame: \(midiEvent.describe())\n")
                 protocolSafeLogInfo("Translated raw bytes: \(midiEvent.hexBytes())\n")
                 try? serialTransport.sendFrame(midiEvent)
@@ -51,7 +77,7 @@ func app_main() {
             }
         }
 
-        // Release notes that were never followed by Note Off
+        // Release notes that were never followed by Note Off or keepalive timeout
         let expiredNoteOffs = noteTracker.collectExpiredNoteOffs(currentTimeMs: currentTimeMs)
         for noteOff in expiredNoteOffs {
             try? serialTransport.sendFrame(noteOff)
