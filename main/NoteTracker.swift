@@ -77,7 +77,9 @@ public final class NoteTracker {
                 reason = "stuck (no NOTE_OFF sent)"
             }
             // Check keepalive timeout and miss threshold
-            else if keepaliveTimeoutMs > 0 && currentTimeMs &- active.lastKeepaliveCheckMs >= keepaliveTimeoutMs {
+            else if keepaliveTimeoutMs > 0
+                && currentTimeMs &- active.lastKeepaliveCheckMs >= keepaliveTimeoutMs
+            {
                 // Update the miss counter and check threshold
                 var updatedNote = active
                 updatedNote.consecutiveMissedKeepalives += 1
@@ -85,7 +87,8 @@ public final class NoteTracker {
 
                 if updatedNote.consecutiveMissedKeepalives >= keepaliveMissThreshold {
                     shouldRemove = true
-                    reason = "keepalive threshold exceeded (\(updatedNote.consecutiveMissedKeepalives) misses)"
+                    reason =
+                        "keepalive threshold exceeded (\(updatedNote.consecutiveMissedKeepalives) misses)"
                 } else {
                     // Keep the note but with incremented miss counter
                     kept.append(updatedNote)
